@@ -5,8 +5,8 @@
     "InternalName": "Onion",
     "Punchline": "Mods are like onions, they have layers!",
     "Description": "Install skin mods as layers and not as skin replacements. Designed to work across female bodies, works with OMP files and Proteus mods.",
-    "AssemblyVersion": "1.2.0.0",
-    "TestingAssemblyVersion": "1.2.0.0",
+    "AssemblyVersion": "1.2.1.0",
+    "TestingAssemblyVersion": "1.2.1.0",
     "RepoUrl": "https://plogon.nyaughty.com",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 15,
@@ -21,11 +21,11 @@
       "body",
       "textures"
     ],
-    "LastUpdate": 1787914096,
+    "LastUpdate": 1788224159,
     "DownloadLinkInstall": "https://plogon.nyaughty.com/Onion.zip",
     "DownloadLinkTesting": "https://plogon.nyaughty.com/Onion-testing.zip",
     "DownloadLinkUpdate": "https://plogon.nyaughty.com/Onion.zip",
-    "Changelog": "- TBSE actually works now!\n- Files with funny characters like \u00e2\u2122\u00a5 hearts should also work properly now.\n- Added a toggle in the settings (DEFAULT OFF) to enable linking with Nyaughty's Toolbox addon - if you don't know what that is just leave it off."
+    "Changelog": "- Onion mods now show their layer number (priority) next to them.\n- You can easily re-order them with the arrow keys - picking the next available slot to avoid conflicts"
   },
   {
     "Author": "Nyaughty",
@@ -50,6 +50,6 @@
     "LastUpdate": 1787960166,
     "DownloadLinkInstall": "https://plogon.nyaughty.com/ReAnimate.zip",
     "DownloadLinkUpdate": "https://plogon.nyaughty.com/ReAnimate.zip",
-    "Changelog": "- New icon\r\n- The swap tab tells you where swaps land and how to undo one\r\n- A swap now says which mod it went into\r\n- Fixed: swapping into a mod with no option groups made a separate mod instead of going inside it"
+    "Changelog": "- New icon\n- The swap tab tells you where swaps land and how to undo one\n- A swap now says which mod it went into\n- Fixed: swapping into a mod with no option groups made a separate mod instead of going inside it"
   }
 ]

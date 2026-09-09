@@ -53,6 +53,34 @@ public static class IdleResolver
     private static string? StartFile(EmoteController.PoseType family, byte slot)
         => slot == 0 ? null : Prefix(family) is { } p ? $"emote/{p}pose{slot:D2}_start" : null;
 
+    // The slot a playing timeline belongs to. Timeline keys are the pap names ("emote/pose03_loop"
+    // = Standing 3, start keys included) except the two base idles, which play under their own
+    // names; the standing idle's fidget variants count as slot 0 too.
+    public static (EmoteController.PoseType Family, byte Slot)? FromKey(string key)
+        => Slots.Value.TryGetValue(key, out var slot) ? slot : null;
+
+    private static readonly Lazy<Dictionary<string, (EmoteController.PoseType, byte)>> Slots = new(() =>
+    {
+        var map = new Dictionary<string, (EmoteController.PoseType, byte)>(StringComparer.Ordinal)
+        {
+            ["normal/idle"] = (EmoteController.PoseType.Idle, 0),
+            ["normal/idle_inactive1"] = (EmoteController.PoseType.Idle, 0),
+            ["normal/idle_inactive2"] = (EmoteController.PoseType.Idle, 0),
+            ["normal/idle_inactive3"] = (EmoteController.PoseType.Idle, 0),
+            ["battle/idle"] = (EmoteController.PoseType.WeaponDrawn, 0),
+        };
+        foreach (var family in GameState.BakeableFamilies)
+        {
+            for (byte slot = 0; slot < GameState.MaxSlots; slot++)
+            {
+                foreach (var (file, _) in FileKeys(family, slot))
+                    map.TryAdd(file, (family, slot));
+            }
+        }
+
+        return map;
+    });
+
     // The loop (and start) file keys of a slot, folder-less, for the animation catalog.
     public static IEnumerable<(string File, string Kind)> FileKeys(EmoteController.PoseType family, byte slot)
     {

@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
@@ -6,7 +7,9 @@ using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.Havok.Animation.Rig;
 using FFXIVClientStructs.Havok.Common.Base.Math.QsTransform;
+using Lumina.Excel.Sheets;
 using ReAnimate.Bake;
+using ReAnimate.Havok;
 using CSGameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace ReAnimate.Game;
@@ -142,12 +145,28 @@ public static unsafe class GameState
         if (cbase == null)
             return null;
 
-        return new PlayerInfo(
-            ((Human*)cbase)->RaceSexId,
-            cbase->AnimationVariant,
-            chara->EmoteController.CurrentPoseType,
-            chara->EmoteController.CPoseState,
-            chara->CharacterData.ClassJob);
+        // the emote controller only records a pose type once /cpose has been used since
+        // login (255 before that), so read the stance off the base timeline that is playing
+        var (family, slot) = PlayingIdle(chara) ?? (chara->EmoteController.CurrentPoseType, chara->EmoteController.CPoseState);
+        return new PlayerInfo(((Human*)cbase)->RaceSexId, cbase->AnimationVariant, family, slot, chara->CharacterData.ClassJob);
+    }
+
+    // Idles play in different sequencer slots (standing in 0, sits in 2, doze in 1 or 3) and
+    // the standing base may stay loaded underneath, so every slot is read and the most
+    // specific idle wins: a numbered pose over a base, a stance base over the standing one.
+    private static (EmoteController.PoseType, byte)? PlayingIdle(Character* chara)
+    {
+        var sheet = Plugin.DataManager.GetExcelSheet<ActionTimeline>();
+        (EmoteController.PoseType, byte)? best = null;
+        foreach (var id in chara->Timeline.TimelineSequencer.TimelineIds)
+        {
+            if (id == 0 || !sheet.TryGetRow(id, out var row) || IdleResolver.FromKey(row.Key.ExtractText()) is not { } found)
+                continue;
+            if (best is not { } b || (found.Slot != 0 && b.Item2 == 0) || (found.Slot == b.Item2 && b.Item1 == EmoteController.PoseType.Idle))
+                best = found;
+        }
+
+        return best;
     }
 
     // The live cpose slot, but only when the player is actually IN that family right now.
@@ -172,8 +191,69 @@ public static unsafe class GameState
             return null;
 
         var references = baseline is null ? null : LiveLocals(baseline.Address, out _);
+        // a twin whose pose cannot be read right now gives no layer to strip, not a wrong one
+        if (baseline is null)
+            StripRuntimeLayer(locals, locals, actor.Address);
+        else if (references is not null)
+            StripRuntimeLayer(locals, references, baseline.Address);
         var (time, duration) = LivePlayback(actor.Address);
         return new CapturedPose(locals, references ?? bindPose, time, duration);
+    }
+
+    // Runtime layers (Customize+ offsets and the like) sit on top of the animation and come
+    // back at playback, so the one translation the snap keeps must not carry them, or every
+    // re-save adds the layer once more. The unposed twin measures it: its live value minus
+    // its own animation output. Outside GPose the actor is its own twin.
+    private static void StripRuntimeLayer(Dictionary<string, BoneTransform> locals, Dictionary<string, BoneTransform> twinLive, nint twin)
+    {
+        var animated = AnimatedLocals(twin);
+        if (animated is null)
+            return;
+        foreach (var name in HavokBaker.TranslatedBones)
+        {
+            if (!locals.TryGetValue(name, out var snap) || !twinLive.TryGetValue(name, out var live) || !animated.TryGetValue(name, out var anim))
+                continue;
+            var layer = live.Translation - anim.Translation;
+            locals[name] = snap with { Translation = snap.Translation - layer };
+            Plugin.Log.Debug($"{name}: runtime layer {layer} taken off the snap");
+        }
+    }
+
+    // What the actor's animations alone put on the body partial right now, sampled from the
+    // game's own animated skeleton: the pose before Customize+, posing tools and physics.
+    private static Dictionary<string, BoneTransform>? AnimatedLocals(nint address)
+    {
+        var partial = BodyPartial(address);
+        var animated = partial == null ? null : partial->GetHavokAnimatedSkeleton(0);
+        if (animated == null || animated->Skeleton == null)
+            return null;
+
+        var skeleton = animated->Skeleton;
+        var count = skeleton->Bones.Length;
+        var bones = nint.Zero;
+        var floats = nint.Zero;
+        try
+        {
+            bones = Marshal.AllocHGlobal(Math.Max(1, count) * sizeof(hkQsTransformf));
+            floats = Marshal.AllocHGlobal(Math.Max(1, skeleton->FloatSlots.Length) * sizeof(float));
+            animated->sampleAndCombineAnimations((hkQsTransformf*)bones, (float*)floats);
+            var result = new Dictionary<string, BoneTransform>(count);
+            for (var i = 0; i < count; i++)
+            {
+                var name = skeleton->Bones.Data[i].Name.String;
+                if (!string.IsNullOrEmpty(name))
+                    result[name] = ToBoneTransform(((hkQsTransformf*)bones)[i]);
+            }
+
+            return result;
+        }
+        finally
+        {
+            if (bones != nint.Zero)
+                Marshal.FreeHGlobal(bones);
+            if (floats != nint.Zero)
+                Marshal.FreeHGlobal(floats);
+        }
     }
 
     // The dominant normal (non-additive) animation control on the body partial: its local

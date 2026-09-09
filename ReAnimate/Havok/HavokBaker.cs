@@ -36,7 +36,9 @@ public static unsafe class HavokBaker
     // The one bone vanilla positions the body with: every stance (stand, sit, ground sit,
     // doze) is n_hara's translation, every other bone's translation is a fixed bone length.
     // So n_hara is the one bone whose position comes from the pose.
-    private static readonly string[] TranslatedBones = ["n_hara"];
+    // the one bone vanilla positions the whole body with
+    private const string BodyBone = "n_hara";
+    internal static readonly string[] TranslatedBones = [BodyBone];
 
     private readonly record struct ExtraTrack(short PlayerIndex, int Depth, Quaternion From, Quaternion Target, BoneTransform Rest);
 
@@ -54,18 +56,22 @@ public static unsafe class HavokBaker
     // Names of the extra bones appended by the most recent bake, for the chat summary.
     public static readonly HashSet<string> ExtraBoneNames = new(StringComparer.Ordinal);
 
+    // How far the most recent loop bake moved the body to meet the ground (model up, metres).
+    public static float LastGroundShift;
+
     // The animation references bones the sampling skeleton does not have (a modded idle
     // needing a skeleton mod the player lacks). Sampling it would corrupt the heap.
     public sealed class SkeletonMismatchException() : Exception("animation needs bones this skeleton does not have");
 
     // Loop bake: frame 0 = the pose, vanilla per-frame deltas on top. Start bake: the vanilla
     // choreography plays under a correction that lands its last frame on the pose (frame 0 pure vanilla).
-    public static byte[] Bake(byte[] papBytes, SkeletonSource skeletonSource, CapturedPose pose, bool asStart, string tempDir, nint interleavedVtbl)
+    public static byte[] Bake(byte[] papBytes, SkeletonSource skeletonSource, CapturedPose pose, bool asStart, Grounding grounding, string tempDir, nint interleavedVtbl)
     {
         var pap = PapFile.Read(papBytes);
         if (pap.HavokData.Length <= 8)
             throw new InvalidDataException("pap has no havok animation data");
         ExtraBoneNames.Clear();
+        LastGroundShift = 0f;
 
         var allocs = new List<nint>();
         hkResource* papRes = null;
@@ -95,7 +101,7 @@ public static unsafe class HavokBaker
 
             var rig = RigFromSkeleton(skeleton);
             for (var i = 0; i < anims->Bindings.Length; i++)
-                BakeAnimation(anims, i, skeleton, pose, rig, asStart, interleavedVtbl, allocs);
+                BakeAnimation(anims, i, skeleton, pose, rig, asStart, grounding, interleavedVtbl, allocs);
 
             var newHavok = SaveContainer(papContainer, tempDir);
 
@@ -146,6 +152,7 @@ public static unsafe class HavokBaker
         CapturedPose pose,
         BoneRig rig,
         bool asStart,
+        Grounding grounding,
         nint interleavedVtbl,
         List<nint> allocs)
     {
@@ -263,6 +270,9 @@ public static unsafe class HavokBaker
             maxDepth = Math.Max(maxDepth, extra.Depth);
         }
 
+        if (!asStart && grounding != Grounding.None)
+            Ground(skeleton, pose, rig, reference, trackBone, bakeFor, grounding);
+
         if (minDepth == int.MaxValue)
             (minDepth, maxDepth) = (0, 0);
         var ease = new BakeMath.StaggeredEase(frames, minDepth, maxDepth);
@@ -345,6 +355,48 @@ public static unsafe class HavokBaker
 
     // The snap is the pose at the reference frame; every frame gets the vanilla delta
     // relative to that frame. Returns the baked frame-0 rotation.
+    // The pose as it will play at the reference frame (snapped rotations on this race's own
+    // bone lengths) against the race's own clip: move the body bone so the lowest leg point
+    // lands where vanilla has it. Feet = both ways (standing bodies rest on their feet);
+    // NoSinking = lift only, a seated or lying body may float on purpose but never sinks.
+    private static void Ground(hkaSkeleton* skeleton, CapturedPose pose, BoneRig rig, hkQsTransformf[] reference, short[] trackBone, BoneTransform?[] bakeFor, Grounding grounding)
+    {
+        var track = Array.FindIndex(trackBone, b => b >= 0 && skeleton->Bones.Data[b].Name.String == BodyBone);
+        if (track < 0 || bakeFor[track] is not { } body)
+            return;
+
+        var count = skeleton->Bones.Length;
+        var parents = new short[count];
+        var refLocals = new BoneTransform[count];
+        var poseLocals = new BoneTransform[count];
+        for (var b = 0; b < count; b++)
+        {
+            parents[b] = b < skeleton->ParentIndices.Length ? skeleton->ParentIndices[b] : (short)-1;
+            refLocals[b] = GameState.ToBoneTransform(reference[b]);
+            var name = skeleton->Bones.Data[b].Name.String;
+            poseLocals[b] = name is not null && !SkipBones.Contains(name) && pose.Locals.TryGetValue(name, out var snap)
+                ? refLocals[b] with { Rotation = snap.Rotation, Translation = name == BodyBone ? body.Translation : refLocals[b].Translation }
+                : refLocals[b];
+        }
+
+        var shift = BakeMath.GroundShift(poseLocals, refLocals, parents, rig.Planted);
+        if (grounding == Grounding.NoSinking && shift <= 0f)
+            return;
+
+        // model-space up, expressed in the body bone's parent frame
+        var bone = trackBone[track];
+        var parent = parents[bone];
+        var up = new Vector3(0f, shift, 0f);
+        if (parent >= 0)
+        {
+            var parentModel = BakeMath.ToModel(poseLocals, parents)[parent];
+            up = Vector3.Transform(up, Quaternion.Inverse(parentModel.Rotation)) / parentModel.Scale;
+        }
+
+        bakeFor[track] = body with { Translation = body.Translation + up };
+        LastGroundShift = shift;
+    }
+
     private static BoneTransform WriteLoopTrack(hkQsTransformf* transforms, int t, int totalTracks, int frames, hkQsTransformf[] samples, hkQsTransformf[] reference, int numBones, short bone, in BoneTransform snap, bool withTranslation)
     {
         var vanillaRef = GameState.ToBoneTransform(reference[bone]);
@@ -527,6 +579,10 @@ public static unsafe class HavokBaker
 
 // Live = hkaSkeleton* of the character's loaded body skeleton; Sklb = vanilla skeleton
 // tagfile bytes for a race that isn't on screen.
+// Feet: the lowest leg point goes where the race's clip has it, both ways. NoSinking: only
+// lifted when below it. None: the body bone stays exactly where the snap put it.
+public enum Grounding { None, Feet, NoSinking }
+
 public sealed record SkeletonSource(nint Live, byte[]? Sklb)
 {
     public static SkeletonSource FromLive(nint skeleton) => new(skeleton, null);

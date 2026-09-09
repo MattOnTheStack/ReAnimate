@@ -137,6 +137,67 @@ if (idlePap is not null && sitPap is not null && posePap is not null)
     Check("re-save: frame-0 reference would drift", !Enumerable.Range(0, 30).All(k => QNear(first[k].Rotation, naive[k].Rotation)));
 }
 
+// the translated bone: a re-save of a playing bake reproduces it exactly; a runtime layer
+// (Customize+ style offset) inside the snap compounds by that offset once per save; taking
+// the snap net of the layer, as measured on the twin (live minus its own animation), is
+// idempotent again
+{
+    var rnd = new Random(11);
+    Vector3 V() => new((float)rnd.NextDouble() * 0.01f, 1f + (float)rnd.NextDouble() * 0.01f, (float)rnd.NextDouble() * 0.01f);
+    var vanilla = Enumerable.Range(0, 30).Select(_ => new BoneTransform(V(), Quaternion.Identity, Vector3.One)).ToArray();
+    var posed = new BoneTransform(new Vector3(0, 0.7f, -0.4f), Quaternion.Identity, Vector3.One);
+    var first = vanilla.Select(v => BakeMath.Bake(posed, vanilla[0], v, withTranslation: true)).ToArray();
+    const int f = 17;
+    var second = vanilla.Select(v => BakeMath.Bake(first[f], vanilla[f], v, withTranslation: true)).ToArray();
+    Check("re-save: translated bone is idempotent", Enumerable.Range(0, 30).All(k => VNear(first[k].Translation, second[k].Translation)));
+
+    var layer = new Vector3(0, 0.09f, 0);
+    var live = first[f] with { Translation = first[f].Translation + layer };
+    var naive = vanilla.Select(v => BakeMath.Bake(live, vanilla[f], v, withTranslation: true)).ToArray();
+    Check("re-save: a runtime layer in the snap compounds by exactly the layer", Enumerable.Range(0, 30).All(k => VNear(naive[k].Translation, first[k].Translation + layer)));
+
+    var twinAnimation = first[f].Translation;
+    var twinLive = twinAnimation + layer;
+    var net = live with { Translation = live.Translation - (twinLive - twinAnimation) };
+    var again = vanilla.Select(v => BakeMath.Bake(net, vanilla[f], v, withTranslation: true)).ToArray();
+    Check("re-save: snap net of the twin's layer is idempotent again", Enumerable.Range(0, 30).All(k => VNear(again[k].Translation, first[k].Translation)));
+}
+
+// grounding: on a toy leg (root, body, hips, thigh, knee, foot) the contact shift puts the
+// lowest leg point back where the reference has it, whatever moved it
+{
+    Quaternion Rx(float deg) => Quaternion.CreateFromAxisAngle(Vector3.UnitX, deg * MathF.PI / 180f);
+    short[] parents = [-1, 0, 1, 2, 3, 4];
+    bool[] planted = [false, false, false, true, true, true];
+    BoneTransform[] reference =
+    [
+        BoneTransform.Identity,
+        BoneTransform.Identity with { Translation = new Vector3(0, 1f, 0) },
+        BoneTransform.Identity,
+        BoneTransform.Identity with { Translation = new Vector3(0, -0.05f, 0) },
+        BoneTransform.Identity with { Translation = new Vector3(0, -0.45f, 0) },
+        BoneTransform.Identity with { Translation = new Vector3(0, -0.45f, 0) },
+    ];
+    var refModel = BakeMath.ToModel(reference, parents);
+    Check("ground: reference foot sits at 0.05", MathF.Abs(refModel[5].Translation.Y - 0.05f) < 1e-5f, $"{refModel[5].Translation.Y}");
+
+    var lifted = (BoneTransform[])reference.Clone();
+    lifted[1] = lifted[1] with { Translation = new Vector3(0, 1.08f, 0) };
+    Check("ground: a body 8cm too high shifts down by 8cm", MathF.Abs(BakeMath.GroundShift(lifted, reference, parents, planted) + 0.08f) < 1e-5f);
+
+    var sunk = (BoneTransform[])reference.Clone();
+    sunk[1] = sunk[1] with { Translation = new Vector3(0, 0.9f, 0) };
+    Check("ground: a body 10cm too low shifts up by 10cm", MathF.Abs(BakeMath.GroundShift(sunk, reference, parents, planted) - 0.10f) < 1e-5f);
+
+    // knee bent 90 degrees: the shin goes horizontal, foot and knee end up level, the body drops to meet them
+    var knelt = (BoneTransform[])reference.Clone();
+    knelt[4] = knelt[4] with { Rotation = Rx(90f) };
+    var shift = BakeMath.GroundShift(knelt, reference, parents, planted);
+    knelt[1] = knelt[1] with { Translation = knelt[1].Translation + new Vector3(0, shift, 0) };
+    var model = BakeMath.ToModel(knelt, parents);
+    Check("ground: bent knee lands on the reference contact height", MathF.Abs(MathF.Min(model[4].Translation.Y, model[5].Translation.Y) - 0.05f) < 1e-5f, $"shift {shift}");
+}
+
 // vanilla-progress timing for _start corrections
 {
     Quaternion Rx(float deg) => Quaternion.CreateFromAxisAngle(Vector3.UnitX, deg * MathF.PI / 180f);

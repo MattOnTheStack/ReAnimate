@@ -126,6 +126,16 @@ public sealed class MainWindow : Window
             ImGui.EndCombo();
         }
 
+        if (Wheel(GameState.PlayableRaces, race) is { } wheeledRace)
+        {
+            race = wheeledRace;
+            slot = LiveSlotFor(family, race, info) ?? 0;
+        }
+
+        // genders are separate races to the game, so this covers both
+        if (race != info.RaceSexId)
+            ImGui.TextColored(ColWarn, "Saving across races or genders may have unexpected results for sitting poses.");
+
         var battleFolder = GameState.BattleFolder(info.ClassJob);
         ImGui.SetNextItemWidth(200);
         if (ImGui.BeginCombo("Pose type", GameState.FamilyLabel(family, battleFolder)))
@@ -140,6 +150,12 @@ public sealed class MainWindow : Window
             }
 
             ImGui.EndCombo();
+        }
+
+        if (Wheel(GameState.BakeableFamilies, family) is { } wheeledFamily)
+        {
+            family = wheeledFamily;
+            slot = LiveSlotFor(family, race, info) ?? 0;
         }
 
         if (family == EmoteController.PoseType.WeaponDrawn && battleFolder is null)
@@ -180,6 +196,9 @@ public sealed class MainWindow : Window
             ImGui.EndCombo();
         }
 
+        if (Wheel(slots, slot) is { } wheeledSlot)
+            slot = wheeledSlot;
+
         ImGui.Spacing();
         ImGui.BeginDisabled(!penumbraOk);
         if (ImGui.Button($"Save pose  →  {IdleResolver.Label(family, (byte)slot, race, battleFolder)}", new Vector2(440, 30)))
@@ -207,6 +226,23 @@ public sealed class MainWindow : Window
         }
 
         return result;
+    }
+
+    // Mouse wheel over the combo just drawn steps through its entries, up = previous.
+    private static T? Wheel<T>(IReadOnlyList<T> items, T current) where T : struct
+    {
+        var wheel = ImGui.GetIO().MouseWheel;
+        if (wheel == 0f || items.Count == 0 || !ImGui.IsItemHovered())
+            return null;
+        var at = 0;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (EqualityComparer<T>.Default.Equals(items[i], current))
+                at = i;
+        }
+
+        var next = Math.Clamp(at - Math.Sign(wheel), 0, items.Count - 1);
+        return next == at ? null : items[next];
     }
 
     private static string RaceLabel(ushort r, PlayerInfo info)
@@ -378,7 +414,7 @@ public sealed class MainWindow : Window
         if (Destructive)
             ImGui.TextColored(ColBad, "Swaps rewrite the mod you pick. That cannot be undone.");
         else
-            ImGui.TextColored(ColWarn, "Swaps go into the mod you pick, as a toggle. Untick it in Penumbra to undo.");
+            ImGui.TextColored(ColWarn, "Swaps are added to the mod you pick as options. Turn them off in Penumbra like any other option.");
         ImGui.Separator();
 
         PollScan();
@@ -423,7 +459,7 @@ public sealed class MainWindow : Window
         }
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("On: the swap is an option inside the mod, untick it in Penumbra whenever.\nOff: the mod's own paths are rewritten, which cannot be undone.");
+            ImGui.SetTooltip("On: the swap is added to the mod as an option you can turn off in Penumbra.\nOff: the mod's own files are rewritten. That cannot be undone.");
         if (selectedMod is null)
         {
             ImGui.TextColored(ColDim, "Pick a mod to see the animations it replaces.");

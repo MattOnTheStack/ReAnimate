@@ -24,6 +24,42 @@ public static class BakeMath
         return new BoneTransform(translation, Quaternion.Normalize(snapped.Rotation * delta), vanillaFrameF.Scale);
     }
 
+    // Parent-first local pose to model space (hkQsTransform composition).
+    public static BoneTransform[] ToModel(ReadOnlySpan<BoneTransform> locals, ReadOnlySpan<short> parents)
+    {
+        var model = new BoneTransform[locals.Length];
+        for (var i = 0; i < locals.Length; i++)
+        {
+            var p = parents[i];
+            model[i] = p < 0 || p >= i ? locals[i] : Compose(model[p], locals[i]);
+        }
+
+        return model;
+    }
+
+    public static BoneTransform Compose(in BoneTransform parent, in BoneTransform local) => new(
+        parent.Translation + Vector3.Transform(parent.Scale * local.Translation, parent.Rotation),
+        Quaternion.Normalize(parent.Rotation * local.Rotation),
+        parent.Scale * local.Scale);
+
+    // Where the body touches the world is the one thing a pose carries across races and
+    // tools: the model-space lift that puts the lowest planted bone of `pose` where the
+    // reference pose has its own. Positive = the pose sits too low.
+    public static float GroundShift(ReadOnlySpan<BoneTransform> pose, ReadOnlySpan<BoneTransform> reference, ReadOnlySpan<short> parents, ReadOnlySpan<bool> planted)
+        => Lowest(ToModel(reference, parents), planted) - Lowest(ToModel(pose, parents), planted);
+
+    private static float Lowest(BoneTransform[] model, ReadOnlySpan<bool> planted)
+    {
+        var y = float.MaxValue;
+        for (var i = 0; i < model.Length; i++)
+        {
+            if (planted[i])
+                y = MathF.Min(y, model[i].Translation.Y);
+        }
+
+        return y == float.MaxValue ? 0f : y;
+    }
+
     // Root-out ease schedule for _start transitions: bones settle parent first, child
     // after, overlapping like a real body does (shoulder, then elbow, then fingers; tail
     // base before tail tip). Each bone gets the same window length, started later the

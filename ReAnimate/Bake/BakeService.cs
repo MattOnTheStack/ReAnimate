@@ -84,7 +84,10 @@ public static class BakeService
         var basedOn = new HashSet<string>();
         var customBones = new HashSet<string>(StringComparer.Ordinal);
 
-        var loop = BakeTarget(plugin, modRoot, target, pose, skeleton, asStart: false, tempDir, vtbl, basedOn);
+        // standing bodies rest on their feet; seated and lying ones may float on purpose (a
+        // fence, a step) but never sink through the floor
+        var grounding = family is EmoteController.PoseType.Idle or EmoteController.PoseType.WeaponDrawn ? Grounding.Feet : Grounding.NoSinking;
+        var loop = BakeTarget(plugin, modRoot, target, pose, skeleton, asStart: false, grounding, tempDir, vtbl, basedOn);
         if (loop is null)
         {
             Plugin.Print("Could not load the animation data.");
@@ -93,6 +96,7 @@ public static class BakeService
 
         bakes[target.GamePath] = loop;
         customBones.UnionWith(HavokBaker.ExtraBoneNames);
+        var groundShift = HavokBaker.LastGroundShift;
 
         // ease-in: the slot's _start transition ends exactly where the loop begins (its
         // frame 0, which differs from the snap when the snap was mid-clip)
@@ -104,7 +108,7 @@ public static class BakeService
                 StringComparer.Ordinal),
         };
         if (IdleResolver.ResolveStart(family, targetSlot, race, info.AnimVariant, battleFolder) is { } startTarget
-            && BakeTarget(plugin, modRoot, startTarget, startPose, skeleton, asStart: true, tempDir, vtbl, basedOn) is { } start)
+            && BakeTarget(plugin, modRoot, startTarget, startPose, skeleton, asStart: true, grounding, tempDir, vtbl, basedOn) is { } start)
             bakes[startTarget.GamePath] = start;
 
         var groupName = GameState.RaceName(race);
@@ -119,6 +123,7 @@ public static class BakeService
         Publish(plugin, plugin.Config.ModDirectory, isNew, groupName, optionName);
         var basis = basedOn.Count > 0 ? $" over {string.Join(", ", basedOn)}" : "";
         var custom = customBones.Count > 0 ? $", +{customBones.Count} custom bone{(customBones.Count == 1 ? "" : "s")}" : "";
+        Plugin.Log.Debug($"ground shift {groundShift:F4} m ({grounding})");
         Plugin.Print($"Saved {groupName} {optionName}{basis}{custom}.");
     }
 
@@ -130,13 +135,13 @@ public static class BakeService
 
     // Bakes over the mod currently replacing the path when the user wants that, falling
     // back to vanilla when the modded file needs bones this skeleton lacks.
-    private static byte[]? BakeTarget(Plugin plugin, string modRoot, IdleTarget target, CapturedPose pose, SkeletonSource skeleton, bool asStart, string tempDir, nint vtbl, HashSet<string> basedOn)
+    private static byte[]? BakeTarget(Plugin plugin, string modRoot, IdleTarget target, CapturedPose pose, SkeletonSource skeleton, bool asStart, Grounding grounding, string tempDir, nint vtbl, HashSet<string> basedOn)
     {
         if (plugin.Config.SaveOverModded && ModdedBasis(plugin, modRoot, target.GamePath) is var (moddedBytes, modName) && moddedBytes is not null)
         {
             try
             {
-                var baked = HavokBaker.Bake(moddedBytes, skeleton, pose, asStart, tempDir, vtbl);
+                var baked = HavokBaker.Bake(moddedBytes, skeleton, pose, asStart, grounding, tempDir, vtbl);
                 basedOn.Add(modName!);
                 return baked;
             }
@@ -152,7 +157,7 @@ public static class BakeService
         }
 
         var papFile = Plugin.DataManager.GetFile(target.GamePath);
-        return papFile is null ? null : HavokBaker.Bake(papFile.Data, skeleton, pose, asStart, tempDir, vtbl);
+        return papFile is null ? null : HavokBaker.Bake(papFile.Data, skeleton, pose, asStart, grounding, tempDir, vtbl);
     }
 
     // The file the character's collection serves for this path, if a mod other than
