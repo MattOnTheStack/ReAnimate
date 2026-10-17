@@ -95,35 +95,39 @@ public static class SwapService
         var optionName = $"{anim.Display} → {target.Name}";
         var startNote = instantStarts.Any(bakes.ContainsKey) ? " It starts instantly." : "";
 
-        var placement = plugin.Config.SwapPlacement;
-
-        // in place: the mod's own option stops replacing the old emote and replaces the new one
-        if (placement == SwapPlacement.RewriteMod && unified
-            && ModWriter.ReplaceInPlace(modRoot, sourceModDir, anim.Group, anim.Option, anim.GamePaths.ToList(), bakes))
+        // either or both; only unified layouts are edited, so an older mod's toggle goes to
+        // the new mod instead
+        var toggleInMod = plugin.Config.SwapToggleInMod && unified;
+        var toNewMod = plugin.Config.SwapToNewMod || (plugin.Config.SwapToggleInMod && !unified);
+        if (!toggleInMod && !toNewMod)
         {
-            plugin.Penumbra.ReloadMod(sourceModDir);
-            plugin.Penumbra.RedrawPlayer();
-            Plugin.Print($"{sourceModName} now plays {anim.Display} as {target.Name}.{startNote}");
+            Plugin.Print("Tick \"A new mod\" or \"A toggle in the mod\" first.");
             return;
         }
 
-        // an option inside the source mod (only unified layouts are edited)
-        if (placement == SwapPlacement.OptionInMod && unified)
+        var places = new List<string>();
+
+        // an option inside the source mod
+        if (toggleInMod)
         {
             ModWriter.WriteOption(modRoot, sourceModDir, sourceModName, SwapGroup, optionName, bakes, SwapGroupPriority);
             BakeService.Publish(plugin, sourceModDir, isNew: false, SwapGroup, optionName);
-            Plugin.Print($"Added \"{optionName}\" to {sourceModName}.{startNote} Turn it off in Penumbra whenever.");
-            return;
+            places.Add(sourceModName);
         }
 
-        // a separate mod next to the source, one option per swap; also where older mod
-        // layouts always go. The source mod stays untouched (switching it off makes the
-        // swap a move rather than a copy).
-        var sibling = SiblingDir(sourceModName);
-        var isNew = !plugin.Penumbra.KnowsMod(sibling);
-        ModWriter.WriteOption(modRoot, sibling, sibling, SwapGroup, optionName, bakes, SwapGroupPriority);
-        BakeService.Publish(plugin, sibling, isNew, SwapGroup, optionName);
-        Plugin.Print($"Added \"{optionName}\" to {(isNew ? "a new mod" : "the mod")} \"{sibling}\".{startNote} {sourceModName} itself is untouched.");
+        // a separate mod next to the source with its own copy of the files, one option per
+        // swap (switching the source off makes the swap a move rather than a copy)
+        if (toNewMod)
+        {
+            var sibling = SiblingDir(sourceModName);
+            var isNew = !plugin.Penumbra.KnowsMod(sibling);
+            ModWriter.WriteOption(modRoot, sibling, sibling, SwapGroup, optionName, bakes, SwapGroupPriority);
+            BakeService.Publish(plugin, sibling, isNew, SwapGroup, optionName);
+            places.Add(isNew ? $"a new mod, \"{sibling}\"" : $"\"{sibling}\"");
+        }
+
+        Plugin.Print($"Added \"{optionName}\" to {string.Join(" and ", places)}.{startNote}"
+            + (toggleInMod ? " Turn it off in Penumbra whenever." : $" {sourceModName} itself is untouched."));
     }
 
     private static string SiblingDir(string sourceModName)

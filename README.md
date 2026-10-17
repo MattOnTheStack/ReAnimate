@@ -3,8 +3,9 @@
 A fork of [Nyaughty's ReAnimate](https://github.com/Nyotee/ReAnimate) with three additions to
 its Animation Swap tab:
 
-- **Swaps go into a new mod by default.** The mod you swap from isn't touched. You can still
-  choose to add swaps as a toggle inside the original mod, or to rewrite it.
+- **Swaps go into a new mod by default.** The mod you swap from isn't touched. You can also
+  add swaps as a toggle inside the original mod, instead or as well. ReAnimate's "rewrite the
+  mod" mode is removed, so nothing changes a mod in a way you can't undo.
 - **Instant start.** When you move an idle that has no start animation of its own onto
   another /cpose slot, the slot's vanilla start transition is cut to one frame, so your
   character goes straight into the idle. Pick **Vanilla transition** to keep the game's
@@ -35,27 +36,26 @@ you log in.
 
 1. Type `/reanimate` and open the **Animation Swap** tab.
 2. Pick the idle mod on the left.
-3. Under **Put swaps in**, choose where the swap goes:
-   - **A new mod** (default): a separate mod called "*mod name* - ReAnimate swaps", in
-     Penumbra's ReAnimate folder. The original mod isn't touched.
+3. Under **Put swaps in**, tick where the swap goes. You can tick one or both:
+   - **A new mod** (ticked by default): a separate mod called "*mod name* - ReAnimate swaps",
+     in Penumbra's ReAnimate folder, with its own copy of the files. The original mod isn't
+     touched.
    - **A toggle in the mod**: an option in a **ReAnimate swaps** group inside the original mod.
      Reinstalling or updating that mod removes it.
-   - **Rewrite the mod**: changes the original mod's own files. This can't be undone except by
-     reinstalling the mod.
 4. Under **When there's no start of its own**, leave **Instant start** selected, or pick
    **Vanilla transition**. If the mod has its own start, it shows that instead, and the start
    moves along with the idle.
 5. In the idle's row, click the button in the **Play it as** column and pick a slot, for
    example **Standing Idle 6**. Sitting, Ground Sit and Doze slots work the same way.
-6. Click **Swap**, then use `/cpose` until you reach that slot.
+6. Click **Swap**, then use `/cpose` until you reach that slot. (**Swap** stays greyed out
+   while neither box under **Put swaps in** is ticked.)
 
 Each swap is its own option in a **ReAnimate swaps** group, so you can turn swaps on and off
 one by one in Penumbra.
 
 The idle also keeps playing on its original slot. With **A new mod**, you can move it rather
 than copy it by turning the original mod off in Penumbra: the new mod has its own copy of the
-files, so it keeps working. With **A toggle in the mod**, turning the mod off turns the swap
-off too.
+files, so it keeps working. A toggle inside the original mod turns off along with that mod.
 
 ## About ReAnimate
 

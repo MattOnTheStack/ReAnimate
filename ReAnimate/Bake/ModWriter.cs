@@ -55,30 +55,6 @@ public static class ModWriter
         SweepOrphans(dir, meta);
     }
 
-    // Rewrites an existing option of a (unified) mod: its redirects for `oldGamePaths` go,
-    // the new ones come in. Group "" = the default container. False when the option is missing.
-    public static bool ReplaceInPlace(string modRoot, string modDir, string groupName, string optionName, IReadOnlyCollection<string> oldGamePaths, Dictionary<string, byte[]> bakes)
-    {
-        var dir = Path.Combine(modRoot, modDir);
-        var meta = LoadMeta(modDir, dir);
-        var filesObject = groupName.Length == 0
-            ? meta["DefaultData"]?["Files"] as JObject
-            : ModMeta.Options(meta)
-                .FirstOrDefault(x => x.Group["Name"]?.ToString() == groupName && x.Option["Name"]?.ToString() == optionName)
-                .Option?["Files"] as JObject;
-        if (filesObject is null)
-            return false;
-
-        var files = WriteFiles(dir, bakes);
-        foreach (var old in oldGamePaths)
-            filesObject.Remove(old);
-        foreach (var (gamePath, file) in files)
-            filesObject[gamePath] = file;
-        File.WriteAllText(Path.Combine(dir, "meta.json"), meta.ToString(Formatting.Indented));
-        SweepOrphans(dir, meta);
-        return true;
-    }
-
     private static Dictionary<string, string> WriteFiles(string dir, Dictionary<string, byte[]> bakes)
     {
         var filesDir = Path.Combine(dir, FilesDir);

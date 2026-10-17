@@ -44,8 +44,6 @@ public sealed class MainWindow : Window
     private readonly Dictionary<string, AnimationCatalog.AnimFlags?> flagCache = new(StringComparer.OrdinalIgnoreCase);
     private string targetFilter = "";
     private bool selectedUnified;
-    private (ModAnim Anim, AnimTarget Target)? pendingSwap;
-    private bool openConfirm;
 
     public MainWindow(Plugin plugin) : base("ReAnimate (Instant Start)###ReAnimateMain")
     {
@@ -377,7 +375,6 @@ public sealed class MainWindow : Window
         var root = plugin.Penumbra.ModDirectory;
         paps = root is null ? [] : ModScanner.Group(ModScanner.Scan(root, dir));
         selectedUnified = root is not null && ModWriter.IsUnifiedMeta(root, dir);
-        pendingSwap = null;
         flagCache.Clear();
         RefreshSwaps();
     }
@@ -390,21 +387,16 @@ public sealed class MainWindow : Window
         swaps = root is null || selectedMod is null ? [] : SwapService.ExistingSwaps(plugin, root, selectedMod, SelectedModName);
     }
 
-    // Older mod layouts are never edited: their swaps always get a mod of their own.
-    private SwapPlacement Placement => selectedMod is not null && !selectedUnified ? SwapPlacement.NewMod : plugin.Config.SwapPlacement;
-
-    // The one placement that rewrites the mod's own redirects instead of adding an option.
-    private bool Destructive => Placement == SwapPlacement.RewriteMod && selectedUnified;
+    // Where a swap goes, as SwapService will do it: older mod layouts are never edited, so a
+    // toggle meant for one goes to the new mod instead.
+    private bool OlderLayout => selectedMod is not null && !selectedUnified;
+    private bool ToggleInMod => plugin.Config.SwapToggleInMod && !OlderLayout;
+    private bool ToNewMod => plugin.Config.SwapToNewMod || (plugin.Config.SwapToggleInMod && OlderLayout);
 
     private void ApplySwap(ModAnim anim, AnimTarget target)
     {
-        var rewritten = Destructive;
         SwapService.Apply(plugin, selectedMod!, SelectedModName, anim, target);
-        // a rewrite changed what the mod replaces, so the list has to be read again
-        if (rewritten)
-            SelectMod(selectedMod!);
-        else
-            RefreshSwaps();
+        RefreshSwaps();
     }
 
     private void DrawSwapTab(bool penumbraOk)
@@ -416,18 +408,14 @@ public sealed class MainWindow : Window
         }
 
         // the question everyone asks: where did my swap go, and how do I take it back
-        switch (Placement)
-        {
-            case SwapPlacement.RewriteMod:
-                ImGui.TextColored(ColBad, "Swaps rewrite the mod you pick. That cannot be undone.");
-                break;
-            case SwapPlacement.OptionInMod:
-                ImGui.TextColored(ColWarn, "Swaps are added to the mod you pick as toggles. Turn them off in Penumbra like any other option.");
-                break;
-            default:
-                ImGui.TextColored(ColWarn, "Swaps go into a new mod of their own. The mod you pick isn't touched.");
-                break;
-        }
+        if (ToNewMod && ToggleInMod)
+            ImGui.TextColored(ColWarn, "Swaps go into a new mod, and are also added to the mod you pick as toggles.");
+        else if (ToggleInMod)
+            ImGui.TextColored(ColWarn, "Swaps are added to the mod you pick as toggles. Turn them off in Penumbra like any other option.");
+        else if (ToNewMod)
+            ImGui.TextColored(ColWarn, "Swaps go into a new mod of their own. The mod you pick isn't touched.");
+        else
+            ImGui.TextColored(ColBad, "Tick where swaps should go: a new mod, a toggle in the mod, or both.");
 
         ImGui.Separator();
 
@@ -485,29 +473,29 @@ public sealed class MainWindow : Window
         ImGui.EndChild();
     }
 
+    // Either or both: a swap can land in its own mod and as a toggle in the source mod.
     private void DrawPlacementChoice()
     {
         ImGui.TextUnformatted("Put swaps in:");
-        PlacementRadio("A new mod", SwapPlacement.NewMod,
-            "Each swap goes into a separate mod, \"<mod> - ReAnimate swaps\", that you can turn off or delete in Penumbra.\nThe mod you pick isn't touched.");
-        ImGui.SameLine();
-        PlacementRadio("A toggle in the mod", SwapPlacement.OptionInMod,
-            "Each swap is added to the mod you pick as an option you can turn off in Penumbra.\nReinstalling or updating that mod removes it. Older mod layouts get a new mod instead.");
-        ImGui.SameLine();
-        PlacementRadio("Rewrite the mod", SwapPlacement.RewriteMod,
-            "The mod's own files are rewritten. That cannot be undone.");
-    }
-
-    private void PlacementRadio(string label, SwapPlacement value, string tooltip)
-    {
-        if (ImGui.RadioButton(label, plugin.Config.SwapPlacement == value))
+        var newMod = plugin.Config.SwapToNewMod;
+        if (ImGui.Checkbox("A new mod", ref newMod))
         {
-            plugin.Config.SwapPlacement = value;
+            plugin.Config.SwapToNewMod = newMod;
             plugin.Config.Save();
         }
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip(tooltip);
+            ImGui.SetTooltip("Each swap goes into a separate mod, \"<mod> - ReAnimate swaps\", with its own copy of the files.\nThe mod you pick isn't touched.");
+        ImGui.SameLine();
+        var toggle = plugin.Config.SwapToggleInMod;
+        if (ImGui.Checkbox("A toggle in the mod", ref toggle))
+        {
+            plugin.Config.SwapToggleInMod = toggle;
+            plugin.Config.Save();
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Each swap is added to the mod you pick as an option you can turn off in Penumbra.\nReinstalling or updating that mod removes it. Older mod layouts get a new mod instead.");
     }
 
     // A /cpose slot plays its _start transition before the loop. An animation that brings
@@ -585,61 +573,14 @@ public sealed class MainWindow : Window
                 targetChoice[i] = picked;
 
             ImGui.TableNextColumn();
-            ImGui.BeginDisabled(!pap.Exists || chosenTarget is null);
+            ImGui.BeginDisabled(!pap.Exists || chosenTarget is null || !(ToNewMod || ToggleInMod));
             if (ImGui.Button("Swap"))
-            {
-                if (Destructive)
-                    (pendingSwap, openConfirm) = ((pap, chosenTarget!), true);
-                else
-                    ApplySwap(pap, chosenTarget!);
-            }
+                ApplySwap(pap, chosenTarget!);
             ImGui.EndDisabled();
 
             ImGui.PopID();
         }
 
         ImGui.EndTable();
-        DrawSwapConfirm();
-    }
-
-    // Rewriting someone's installed mod cannot be taken back, so it asks first.
-    private void DrawSwapConfirm()
-    {
-        if (pendingSwap is not { } pending)
-            return;
-
-        // opened once, never per frame, or Escape would just reopen it
-        if (openConfirm)
-        {
-            ImGui.OpenPopup("###confirmswap");
-            openConfirm = false;
-        }
-
-        var open = true;
-        ImGui.SetNextWindowSize(new Vector2(440, 0)); // height 0 = fit the text, width wraps it
-        if (!ImGui.BeginPopupModal("Heads up###confirmswap", ref open, ImGuiWindowFlags.None))
-        {
-            pendingSwap = null;
-            return;
-        }
-
-        ImGui.TextColored(ColBad, "This cannot be undone.");
-        ImGui.TextWrapped($"\"Rewrite the mod\" is selected, so {SelectedModName} gets rewritten: {pending.Anim.Display} stops playing where it does now and plays as {pending.Target.Name} instead. Getting it back means reinstalling the mod.");
-        ImGui.Spacing();
-        if (ImGui.Button("Rewrite the mod", new Vector2(150, 0)))
-        {
-            ApplySwap(pending.Anim, pending.Target);
-            pendingSwap = null;
-            ImGui.CloseCurrentPopup();
-        }
-
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(100, 0)))
-        {
-            pendingSwap = null;
-            ImGui.CloseCurrentPopup();
-        }
-
-        ImGui.EndPopup();
     }
 }
