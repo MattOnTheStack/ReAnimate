@@ -1,0 +1,91 @@
+# Builds the plugin on every push, publishes it as a GitHub release, and updates the
+# plugin repository (repo.json on the `dist` branch) that Dalamud installs from:
+#   https://raw.githubusercontent.com/MattOnTheStack/ReAnimate/dist/repo.json
+name: Build and publish
+
+on:
+  push:
+    branches: [main, instant-start]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# one publish at a time, so repo.json never goes backwards
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  PLUGIN: ReAnimateInstantStart
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download Dalamud
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'dalamud'
+          Invoke-WebRequest https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile "$dir.zip"
+          Expand-Archive "$dir.zip" $dir
+          # forward slashes: a trailing backslash would escape the closing quote on the msbuild command line
+          "DALAMUD=$($dir.Replace('\', '/'))/" >> $env:GITHUB_ENV
+
+      - name: Version
+        run: |
+          # the csproj's major.minor.build, with this run's number as the revision
+          [xml]$proj = Get-Content ReAnimate/ReAnimate.csproj
+          $base = [version]($proj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1)
+          "VERSION=$($base.Major).$($base.Minor).$($base.Build).$env:GITHUB_RUN_NUMBER" >> $env:GITHUB_ENV
+
+      - name: Build
+        run: dotnet build ReAnimate/ReAnimate.csproj -c Release -p:DalamudLibPath=$env:DALAMUD -p:Version=$env:VERSION
+
+      - name: Package
+        run: |
+          $out = 'ReAnimate/bin/Release'
+          $manifestPath = "$out/$env:PLUGIN.json"
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.AssemblyVersion = $env:VERSION
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content $manifestPath -Encoding utf8NoBOM
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "$out/$env:PLUGIN.dll", $manifestPath, "$out/images" -DestinationPath "dist/$env:PLUGIN.zip"
+          (git log -1 --format=%B) -join "`n" | Set-Content dist/notes.txt -Encoding utf8NoBOM
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$env:VERSION" "dist/$env:PLUGIN.zip" --title "$env:PLUGIN $env:VERSION" --notes-file dist/notes.txt --target $env:GITHUB_SHA
+
+      - name: Publish repo.json
+        run: |
+          $manifest = Get-Content "ReAnimate/bin/Release/$env:PLUGIN.json" -Raw | ConvertFrom-Json
+          $zip = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$env:VERSION/$env:PLUGIN.zip"
+          $entry = [ordered]@{}
+          foreach ($p in $manifest.PSObject.Properties) { $entry[$p.Name] = $p.Value }
+          $entry.IsHide = $false
+          $entry.IsTestingExclusive = $false
+          $entry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          $entry.DownloadLinkInstall = $zip
+          $entry.DownloadLinkUpdate = $zip
+          $entry.Changelog = Get-Content dist/notes.txt -Raw
+          $json = ConvertTo-Json -InputObject @($entry) -Depth 5
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          $wt = Join-Path $env:RUNNER_TEMP 'dist-branch'
+          git fetch --depth=1 origin dist
+          if ($LASTEXITCODE -eq 0) { git worktree add -B dist $wt origin/dist } else { git worktree add --orphan -b dist $wt }
+          $json | Set-Content "$wt/repo.json" -Encoding utf8NoBOM
+          git -C $wt add repo.json
+          git -C $wt commit -m "Publish $env:PLUGIN $env:VERSION"
+          git -C $wt push origin dist

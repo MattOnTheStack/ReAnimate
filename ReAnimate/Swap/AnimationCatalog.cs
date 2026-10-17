@@ -41,8 +41,20 @@ public static partial class AnimationCatalog
     // (ground sit), s_laugh (chair), u_laugh (upper body), b_/l_ likewise.
     private static readonly string[] VariantPrefixes = ["j_", "s_", "u_", "l_", "b_"];
 
+    // A stance's base file (its cpose slot 0) has no prefix of its own but belongs with that
+    // stance's numbered slots, so a default chair-sit mod lands on s_ slots, not standing ones.
+    private static readonly (string Base, string Prefix)[] BasePrefixes =
+        [("emote/sit", "s_"), ("emote/jmn", "j_"), ("emote/doze", "l_")];
+
     public static string VariantPrefix(string key)
     {
+        var stem = Path.ChangeExtension(key, null).Replace('\\', '/');
+        foreach (var (baseKey, basePrefix) in BasePrefixes)
+        {
+            if (stem.Equals(baseKey, StringComparison.OrdinalIgnoreCase) || stem.EndsWith($"/{baseKey}", StringComparison.OrdinalIgnoreCase))
+                return basePrefix;
+        }
+
         var file = key[(key.LastIndexOf('/') + 1)..];
         return VariantPrefixes.FirstOrDefault(p => file.StartsWith(p, StringComparison.OrdinalIgnoreCase)) ?? "";
     }

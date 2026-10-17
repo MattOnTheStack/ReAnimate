@@ -4,6 +4,10 @@ obj/
 .vs/
 refs/
 release/
+# Dalamud reference libraries for local builds (CI downloads its own)
+.dalamud/
+# game files extracted for tools/Checks
+testfiles/
 NOTES.md
 
 # the shipped icon only: sources and banners stay local

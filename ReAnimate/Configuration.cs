@@ -14,6 +14,10 @@ public sealed class Configuration : IPluginConfiguration
     // mod's own paths in place).
     public bool SwapAsOption { get; set; } = true;
 
+    // An animation with no start of its own moved onto a /cpose slot: the slot's vanilla
+    // start is cut to one frame so the idle begins at once (off = the vanilla transition plays).
+    public bool InstantStart { get; set; } = true;
+
     // High so the bake wins over other animation mods touching the same paths.
     public int ModPriority { get; set; } = 99;
 

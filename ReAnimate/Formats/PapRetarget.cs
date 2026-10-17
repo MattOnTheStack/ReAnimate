@@ -63,4 +63,13 @@ public static class PapRetarget
         source.SetTmbs(tmbs);
         return source.Write();
     }
+
+    // A slot's vanilla _start pap cut to one frame: the swapped loop takes over at once
+    // instead of after the vanilla transition into the slot's own pose.
+    public static byte[] InstantStart(byte[] startBytes)
+    {
+        var pap = PapFile.Read(startBytes);
+        pap.SetTmbs(pap.Tmbs().Select(t => TmbFile.SetAnimationDuration(t, 1)).ToList());
+        return pap.Write();
+    }
 }

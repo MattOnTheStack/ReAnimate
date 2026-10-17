@@ -1,0 +1,19 @@
+{
+  "Name": "ReAnimate (Instant Start)",
+  "Author": "Nyaughty, fork by MattOnTheStack",
+  "Punchline": "ReAnimate, plus instant starts when moving idles between /cpose slots.",
+  "Description": "A fork of Nyaughty's ReAnimate. Animation Swap can make the start transition instant when an idle has no start of its own, and default-idle mods can be moved onto numbered /cpose slots. Everything else is ReAnimate as it is: turn your current pose into an idle pose with a single click.",
+  "InternalName": "ReAnimateInstantStart",
+  "AssemblyVersion": "1.2.3.0",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/MattOnTheStack/ReAnimate",
+  "IconUrl": "https://raw.githubusercontent.com/MattOnTheStack/ReAnimate/main/icon/reanimate.png",
+  "Tags": [
+    "penumbra",
+    "pose",
+    "idle",
+    "animation",
+    "cpose"
+  ],
+  "DalamudApiLevel": 15
+}

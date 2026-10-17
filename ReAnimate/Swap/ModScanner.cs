@@ -34,7 +34,14 @@ public sealed record ModAnim(string Group, string Option, IReadOnlyDictionary<st
     public ModPart Main { get; } = MainOf(Parts);
     public string Display { get; } = Describe(MainOf(Parts), Parts.ContainsKey("loop"));
     public string Label => Group.Length == 0 ? Option : $"{Group} / {Option}";
-    public ModPart? PartFor(string kind) => kind.Length == 0 ? Main : Parts.GetValueOrDefault(kind);
+    // A slot's loop takes the mod's loop, or its single file (a default idle like
+    // resident/idle has no _loop twin); a slot's start only ever takes the mod's own start.
+    public ModPart? PartFor(string kind) => kind switch
+    {
+        "" => Main,
+        "loop" => Parts.GetValueOrDefault("loop") ?? Parts.GetValueOrDefault(""),
+        _ => Parts.GetValueOrDefault(kind),
+    };
     public string RelKey => Main.RelKey;
     public IReadOnlyDictionary<ushort, string> Files => Main.Files;
     public IEnumerable<string> GamePaths => Parts.Values.SelectMany(p => p.GamePaths);

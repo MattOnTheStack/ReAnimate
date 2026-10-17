@@ -50,6 +50,7 @@ entries = load_index(os.path.join(GAME, '040000.win32.index'))
 targets = {
     'idle_c0801.pap': 'chara/human/c0801/animation/a0001/bt_common/resident/idle.pap',
     'pose01_c0801.pap': 'chara/human/c0801/animation/a0001/bt_common/emote/pose01_loop.pap',
+    'start01_c0801.pap': 'chara/human/c0801/animation/a0001/bt_common/emote/pose01_start.pap',
     'sit_c0801.pap': 'chara/human/c0801/animation/a0001/bt_common/emote/sit.pap',
     'skl_c0801.sklb': 'chara/human/c0801/skeleton/base/b0001/skl_c0801b0001.sklb',
 }

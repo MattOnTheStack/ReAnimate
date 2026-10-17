@@ -47,7 +47,7 @@ public sealed class MainWindow : Window
     private (ModAnim Anim, AnimTarget Target)? pendingSwap;
     private bool openConfirm;
 
-    public MainWindow(Plugin plugin) : base("ReAnimate###ReAnimateMain")
+    public MainWindow(Plugin plugin) : base("ReAnimate (Instant Start)###ReAnimateMain")
     {
         this.plugin = plugin;
         Size = new Vector2(720, 480);
@@ -460,6 +460,8 @@ public sealed class MainWindow : Window
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("On: the swap is added to the mod as an option you can turn off in Penumbra.\nOff: the mod's own files are rewritten. That cannot be undone.");
+        if (selectedMod is not null && paps.Count > 0)
+            DrawStartChoice();
         if (selectedMod is null)
         {
             ImGui.TextColored(ColDim, "Pick a mod to see the animations it replaces.");
@@ -474,6 +476,36 @@ public sealed class MainWindow : Window
         }
 
         ImGui.EndChild();
+    }
+
+    // A /cpose slot plays its _start transition before the loop. An animation that brings
+    // its own start moves it along; for one that doesn't, the player picks how it begins.
+    private void DrawStartChoice()
+    {
+        if (paps.All(p => p.PartFor("start") is not null))
+        {
+            ImGui.TextColored(ColDim, "This mod has its own start, which will be moved too.");
+            return;
+        }
+
+        ImGui.TextUnformatted("When there's no start of its own:");
+        ImGui.SameLine();
+        var instant = plugin.Config.InstantStart;
+        if (ImGui.RadioButton("Instant start", instant))
+            SetInstantStart(true);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Skips the slot's start transition: your character goes straight into the idle.");
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Vanilla transition", !instant))
+            SetInstantStart(false);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Plays the game's normal transition into the slot first, then the idle.");
+    }
+
+    private void SetInstantStart(bool on)
+    {
+        plugin.Config.InstantStart = on;
+        plugin.Config.Save();
     }
 
     private void DrawPapTable()

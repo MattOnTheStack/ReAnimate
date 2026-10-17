@@ -20,6 +20,7 @@ public static class SwapService
         }
 
         var bakes = new Dictionary<string, byte[]>();
+        var instantStarts = new List<string>();
         var retargeted = new Dictionary<(string File, string Key), (byte[] Bytes, Dictionary<string, string> Renamed)>();
         var sourceTmbs = ModScanner.ScanTmbs(modRoot, sourceModDir);
         var sourceKey = Path.ChangeExtension(anim.RelKey[(anim.RelKey.IndexOf('/') + 1)..], null);
@@ -37,7 +38,13 @@ public static class SwapService
                 // the matching half of a loop+start pair, or the loop for a plain emote key
                 var part = anim.PartFor(variant.Kind);
                 if (part is null)
+                {
+                    // no start of its own: the slot's vanilla start gets cut to one frame,
+                    // unless the vanilla transition is wanted (then it stays untouched)
+                    if (variant.Kind == "start" && plugin.Config.InstantStart)
+                        instantStarts.AddRange(paths);
                     continue;
+                }
 
                 Dictionary<string, string>? renamedForTmb = null;
                 foreach (var path in paths)
@@ -60,6 +67,16 @@ public static class SwapService
                 if (sourceTmbs.TryGetValue($"chara/action/{sourceKey}.tmb", out var tmbFile) && renamedForTmb is not null)
                     bakes[$"chara/action/{variant.Key}.tmb"] = TmbFile.RenamePaths(File.ReadAllBytes(tmbFile), renamedForTmb);
             }
+
+            // each race's own vanilla start, and only alongside an animation that moved
+            if (bakes.Count > 0)
+            {
+                foreach (var path in instantStarts)
+                {
+                    if (Plugin.DataManager.GetFile(path) is { } start)
+                        bakes[path] = PapRetarget.InstantStart(start.Data);
+                }
+            }
         }
         catch (Exception ex) when (ex is InvalidDataException or IndexOutOfRangeException or ArgumentException or IOException)
         {
@@ -76,6 +93,7 @@ public static class SwapService
 
         var unified = ModWriter.IsUnifiedMeta(modRoot, sourceModDir);
         var optionName = $"{anim.Display} → {target.Name}";
+        var startNote = instantStarts.Any(bakes.ContainsKey) ? " It starts instantly." : "";
 
         // in place: the mod's own option stops replacing the old emote and replaces the new one
         if (!plugin.Config.SwapAsOption && unified
@@ -83,7 +101,7 @@ public static class SwapService
         {
             plugin.Penumbra.ReloadMod(sourceModDir);
             plugin.Penumbra.RedrawPlayer();
-            Plugin.Print($"{sourceModName} now plays {anim.Display} as {target.Name}.");
+            Plugin.Print($"{sourceModName} now plays {anim.Display} as {target.Name}.{startNote}");
             return;
         }
 
@@ -91,7 +109,7 @@ public static class SwapService
         {
             ModWriter.WriteOption(modRoot, sourceModDir, sourceModName, SwapGroup, optionName, bakes, SwapGroupPriority);
             BakeService.Publish(plugin, sourceModDir, isNew: false, SwapGroup, optionName);
-            Plugin.Print($"Added \"{optionName}\" to {sourceModName}. Turn it off in Penumbra whenever.");
+            Plugin.Print($"Added \"{optionName}\" to {sourceModName}.{startNote} Turn it off in Penumbra whenever.");
             return;
         }
 
@@ -100,7 +118,7 @@ public static class SwapService
         var isNew = !plugin.Penumbra.KnowsMod(sibling);
         ModWriter.WriteOption(modRoot, sibling, sibling, SwapGroup, optionName, bakes, SwapGroupPriority);
         BakeService.Publish(plugin, sibling, isNew, SwapGroup, optionName);
-        Plugin.Print($"Added \"{optionName}\" as a new mod, \"{sibling}\". Turn it off in Penumbra whenever.");
+        Plugin.Print($"Added \"{optionName}\" as a new mod, \"{sibling}\".{startNote} Turn it off in Penumbra whenever.");
     }
 
     private static string SiblingDir(string sourceModName)

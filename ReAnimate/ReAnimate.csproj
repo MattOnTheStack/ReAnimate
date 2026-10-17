@@ -7,7 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>1.2.3.0</Version>
-    <AssemblyName>ReAnimate</AssemblyName>
+    <!-- fork: its own name so it installs next to (not over) the official ReAnimate -->
+    <AssemblyName>ReAnimateInstantStart</AssemblyName>
     <RootNamespace>ReAnimate</RootNamespace>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -52,7 +53,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="ReAnimate.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="ReAnimateInstantStart.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- dev plugins take their installer icon from images\icon.png beside the dll
          (IconUrl only covers repo installs); the zip carries it along too -->
     <None Include="..\icon\reanimate.png" CopyToOutputDirectory="PreserveNewest" Link="images\icon.png" />

@@ -121,6 +121,30 @@ if (idlePap is not null && sitPap is not null && posePap is not null)
     Check("retarget: second retarget still parses", PapFile.Read(longer).AnimCount == 1);
 }
 
+// instant start: a vanilla _start cut to one frame, nothing else touched
+var startPap = papFiles.FirstOrDefault(f => Path.GetFileName(f).StartsWith("start01_"));
+if (startPap is not null)
+{
+    var startBytes = File.ReadAllBytes(startPap);
+    var start = PapFile.Read(startBytes);
+    var instantBytes = PapRetarget.InstantStart(startBytes);
+    var instant = PapFile.Read(instantBytes);
+    var startTmbs = start.Tmbs();
+    var instantTmbs = instant.Tmbs();
+
+    Check("instant start: vanilla start lasts more than a frame", startTmbs.All(t => TmbFile.C009Duration(t) > 1),
+        string.Join(", ", startTmbs.Select(TmbFile.C009Duration)));
+    Check("instant start: every timeline lasts one frame", instantTmbs.Count == startTmbs.Count && instantTmbs.All(t => TmbFile.C009Duration(t) == 1),
+        string.Join(", ", instantTmbs.Select(TmbFile.C009Duration)));
+    Check("instant start: same size", instantBytes.Length == startBytes.Length, $"{startBytes.Length} -> {instantBytes.Length} bytes");
+    Check("instant start: names kept", Enumerable.Range(0, start.AnimCount).All(i => instant.AnimName(i) == start.AnimName(i)));
+    Check("instant start: havok untouched", instant.HavokData.AsSpan().SequenceEqual(start.HavokData));
+    Check("instant start: C009 paths kept", Enumerable.Range(0, startTmbs.Count).All(i => TmbFile.AnimationPaths(instantTmbs[i]).SequenceEqual(TmbFile.AnimationPaths(startTmbs[i]))));
+    var changed = Enumerable.Range(0, Math.Min(startBytes.Length, instantBytes.Length)).Count(i => startBytes[i] != instantBytes[i]);
+    var c009Bound = 4 * startTmbs.Sum(t => TmbFile.AnimationPaths(t).Count);
+    Check("instant start: only duration bytes change", changed > 0 && changed <= c009Bound, $"{changed} bytes differ");
+}
+
 // re-save idempotence: baking the live frame f of a previous bake, with f as reference,
 // reproduces the previous bake exactly
 {

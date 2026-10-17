@@ -88,6 +88,20 @@ public static class TmbFile
         return result;
     }
 
+    // A copy with every C009's duration set to `frames`. Fixed-size field, patched in place;
+    // a one-frame start hands over to the slot's loop at once.
+    public static byte[] SetAnimationDuration(byte[] tmb, int frames)
+    {
+        var result = (byte[])tmb.Clone();
+        foreach (var (start, magic) in Items(result))
+        {
+            if (magic == "C009")
+                BitConverter.GetBytes(frames).CopyTo(result, start + 0x0C);
+        }
+
+        return result;
+    }
+
     // Duration (frames) of the first C009, -1 without one.
     public static int C009Duration(byte[] tmb)
     {
