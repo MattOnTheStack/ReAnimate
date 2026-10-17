@@ -5,7 +5,7 @@
     "Punchline": "ReAnimate, plus instant starts when moving idles between /cpose slots.",
     "Description": "A fork of Nyaughty's ReAnimate. Animation Swap can make the start transition instant when an idle has no start of its own, and default-idle mods can be moved onto numbered /cpose slots. Everything else is ReAnimate as it is: turn your current pose into an idle pose with a single click.",
     "InternalName": "ReAnimateInstantStart",
-    "AssemblyVersion": "1.2.3.2",
+    "AssemblyVersion": "1.2.3.3",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/MattOnTheStack/ReAnimate",
     "IconUrl": "https://raw.githubusercontent.com/MattOnTheStack/ReAnimate/main/icon/reanimate.png",
@@ -19,9 +19,9 @@
     "DalamudApiLevel": 15,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "LastUpdate": 1792265587,
-    "DownloadLinkInstall": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.2/ReAnimateInstantStart.zip",
-    "DownloadLinkUpdate": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.2/ReAnimateInstantStart.zip",
-    "Changelog": "Let swaps go into a new mod, a toggle in the mod, or a rewrite\n\nAnimation Swap now asks where a swap lands, defaulting to a separate\n\"<mod> - ReAnimate swaps\" mod so the mod you swap from is never touched.\n\"A toggle in the mod\" keeps the earlier behaviour (an option inside the\nsource mod) and \"Rewrite the mod\" is the old destructive in-place mode,\nstill behind its confirmation. Older mod layouts always get a new mod.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\r\n"
+    "LastUpdate": 1792265876,
+    "DownloadLinkInstall": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.3/ReAnimateInstantStart.zip",
+    "DownloadLinkUpdate": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.3/ReAnimateInstantStart.zip",
+    "Changelog": "Say in the Idle2Pose tab that it saves a still frame\n\nSaving mid-emote freezes one frame of the animation, which reads as limbs\nout of place. The tab now says so and points to Animation Swap for copying\na mod's moving animation.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\r\n"
   }
 ]
