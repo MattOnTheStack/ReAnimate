@@ -5,7 +5,7 @@
     "Punchline": "ReAnimate, plus instant starts when moving idles between /cpose slots.",
     "Description": "A fork of Nyaughty's ReAnimate. Animation Swap can make the start transition instant when an idle has no start of its own, and default-idle mods can be moved onto numbered /cpose slots. Everything else is ReAnimate as it is: turn your current pose into an idle pose with a single click.",
     "InternalName": "ReAnimateInstantStart",
-    "AssemblyVersion": "1.2.3.3",
+    "AssemblyVersion": "1.2.3.4",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/MattOnTheStack/ReAnimate",
     "IconUrl": "https://raw.githubusercontent.com/MattOnTheStack/ReAnimate/main/icon/reanimate.png",
@@ -19,9 +19,9 @@
     "DalamudApiLevel": 15,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "LastUpdate": 1792265876,
-    "DownloadLinkInstall": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.3/ReAnimateInstantStart.zip",
-    "DownloadLinkUpdate": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.3/ReAnimateInstantStart.zip",
-    "Changelog": "Say in the Idle2Pose tab that it saves a still frame\n\nSaving mid-emote freezes one frame of the animation, which reads as limbs\nout of place. The tab now says so and points to Animation Swap for copying\na mod's moving animation.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\r\n"
+    "LastUpdate": 1792266395,
+    "DownloadLinkInstall": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.4/ReAnimateInstantStart.zip",
+    "DownloadLinkUpdate": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.4/ReAnimateInstantStart.zip",
+    "Changelog": "Make swap placement two checkboxes, remove rewrite mode\n\n\"Put swaps in\" is now two independent checkboxes, \"A new mod\" (on by\ndefault) and \"A toggle in the mod\", so a swap can land in a separate mod,\nas a toggle in the source mod, or both. Swap is disabled while neither is\nticked. The destructive \"rewrite the mod\" mode, its confirmation and\nModWriter.ReplaceInPlace are removed: nothing edits a mod irreversibly.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\r\n"
   }
 ]
