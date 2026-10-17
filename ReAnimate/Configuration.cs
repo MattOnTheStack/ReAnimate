@@ -10,9 +10,10 @@ public sealed class Configuration : IPluginConfiguration
     public string ModDirectory { get; set; } = "ReAnimate";
     public string ModDisplayName { get; set; } = "ReAnimate";
 
-    // Swaps land as a "ReAnimate swaps" option inside the source mod (off = rewrite the
-    // mod's own paths in place).
-    public bool SwapAsOption { get; set; } = true;
+    // Where an animation swap lands: its own "<mod> - ReAnimate swaps" mod (the source mod
+    // untouched), a "ReAnimate swaps" option inside the source mod, or the source mod's own
+    // paths rewritten in place.
+    public SwapPlacement SwapPlacement { get; set; } = SwapPlacement.NewMod;
 
     // An animation with no start of its own moved onto a /cpose slot: the slot's vanilla
     // start is cut to one frame so the idle begins at once (off = the vanilla transition plays).
@@ -30,4 +31,11 @@ public sealed class Configuration : IPluginConfiguration
     public bool SaveOverModded { get; set; } = true;
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
+}
+
+public enum SwapPlacement
+{
+    NewMod,
+    OptionInMod,
+    RewriteMod,
 }

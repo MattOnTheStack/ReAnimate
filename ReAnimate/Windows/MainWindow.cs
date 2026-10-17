@@ -387,9 +387,11 @@ public sealed class MainWindow : Window
         swaps = root is null || selectedMod is null ? [] : SwapService.ExistingSwaps(plugin, root, selectedMod, SelectedModName);
     }
 
-    // The one placement that rewrites the mod's own redirects instead of adding an option
-    // (older mod layouts get a sibling mod, which stays toggleable either way).
-    private bool Destructive => !plugin.Config.SwapAsOption && selectedUnified;
+    // Older mod layouts are never edited: their swaps always get a mod of their own.
+    private SwapPlacement Placement => selectedMod is not null && !selectedUnified ? SwapPlacement.NewMod : plugin.Config.SwapPlacement;
+
+    // The one placement that rewrites the mod's own redirects instead of adding an option.
+    private bool Destructive => Placement == SwapPlacement.RewriteMod && selectedUnified;
 
     private void ApplySwap(ModAnim anim, AnimTarget target)
     {
@@ -411,10 +413,19 @@ public sealed class MainWindow : Window
         }
 
         // the question everyone asks: where did my swap go, and how do I take it back
-        if (Destructive)
-            ImGui.TextColored(ColBad, "Swaps rewrite the mod you pick. That cannot be undone.");
-        else
-            ImGui.TextColored(ColWarn, "Swaps are added to the mod you pick as options. Turn them off in Penumbra like any other option.");
+        switch (Placement)
+        {
+            case SwapPlacement.RewriteMod:
+                ImGui.TextColored(ColBad, "Swaps rewrite the mod you pick. That cannot be undone.");
+                break;
+            case SwapPlacement.OptionInMod:
+                ImGui.TextColored(ColWarn, "Swaps are added to the mod you pick as toggles. Turn them off in Penumbra like any other option.");
+                break;
+            default:
+                ImGui.TextColored(ColWarn, "Swaps go into a new mod of their own. The mod you pick isn't touched.");
+                break;
+        }
+
         ImGui.Separator();
 
         PollScan();
@@ -451,17 +462,10 @@ public sealed class MainWindow : Window
 
         // right: that mod's animations
         ImGui.BeginChild("##swapanims", new Vector2(0, 0), true);
-        var asOption = plugin.Config.SwapAsOption;
-        if (ImGui.Checkbox("Add as a mod option", ref asOption))
-        {
-            plugin.Config.SwapAsOption = asOption;
-            plugin.Config.Save();
-        }
-
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("On: the swap is added to the mod as an option you can turn off in Penumbra.\nOff: the mod's own files are rewritten. That cannot be undone.");
+        DrawPlacementChoice();
         if (selectedMod is not null && paps.Count > 0)
             DrawStartChoice();
+        ImGui.Separator();
         if (selectedMod is null)
         {
             ImGui.TextColored(ColDim, "Pick a mod to see the animations it replaces.");
@@ -478,6 +482,31 @@ public sealed class MainWindow : Window
         ImGui.EndChild();
     }
 
+    private void DrawPlacementChoice()
+    {
+        ImGui.TextUnformatted("Put swaps in:");
+        PlacementRadio("A new mod", SwapPlacement.NewMod,
+            "Each swap goes into a separate mod, \"<mod> - ReAnimate swaps\", that you can turn off or delete in Penumbra.\nThe mod you pick isn't touched.");
+        ImGui.SameLine();
+        PlacementRadio("A toggle in the mod", SwapPlacement.OptionInMod,
+            "Each swap is added to the mod you pick as an option you can turn off in Penumbra.\nReinstalling or updating that mod removes it. Older mod layouts get a new mod instead.");
+        ImGui.SameLine();
+        PlacementRadio("Rewrite the mod", SwapPlacement.RewriteMod,
+            "The mod's own files are rewritten. That cannot be undone.");
+    }
+
+    private void PlacementRadio(string label, SwapPlacement value, string tooltip)
+    {
+        if (ImGui.RadioButton(label, plugin.Config.SwapPlacement == value))
+        {
+            plugin.Config.SwapPlacement = value;
+            plugin.Config.Save();
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(tooltip);
+    }
+
     // A /cpose slot plays its _start transition before the loop. An animation that brings
     // its own start moves it along; for one that doesn't, the player picks how it begins.
     private void DrawStartChoice()
@@ -489,7 +518,6 @@ public sealed class MainWindow : Window
         }
 
         ImGui.TextUnformatted("When there's no start of its own:");
-        ImGui.SameLine();
         var instant = plugin.Config.InstantStart;
         if (ImGui.RadioButton("Instant start", instant))
             SetInstantStart(true);
@@ -593,7 +621,7 @@ public sealed class MainWindow : Window
         }
 
         ImGui.TextColored(ColBad, "This cannot be undone.");
-        ImGui.TextWrapped($"\"Add as a mod option\" is off, so {SelectedModName} gets rewritten: {pending.Anim.Display} stops playing where it does now and plays as {pending.Target.Name} instead. Getting it back means reinstalling the mod.");
+        ImGui.TextWrapped($"\"Rewrite the mod\" is selected, so {SelectedModName} gets rewritten: {pending.Anim.Display} stops playing where it does now and plays as {pending.Target.Name} instead. Getting it back means reinstalling the mod.");
         ImGui.Spacing();
         if (ImGui.Button("Rewrite the mod", new Vector2(150, 0)))
         {

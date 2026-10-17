@@ -95,8 +95,10 @@ public static class SwapService
         var optionName = $"{anim.Display} → {target.Name}";
         var startNote = instantStarts.Any(bakes.ContainsKey) ? " It starts instantly." : "";
 
+        var placement = plugin.Config.SwapPlacement;
+
         // in place: the mod's own option stops replacing the old emote and replaces the new one
-        if (!plugin.Config.SwapAsOption && unified
+        if (placement == SwapPlacement.RewriteMod && unified
             && ModWriter.ReplaceInPlace(modRoot, sourceModDir, anim.Group, anim.Option, anim.GamePaths.ToList(), bakes))
         {
             plugin.Penumbra.ReloadMod(sourceModDir);
@@ -105,7 +107,8 @@ public static class SwapService
             return;
         }
 
-        if (unified)
+        // an option inside the source mod (only unified layouts are edited)
+        if (placement == SwapPlacement.OptionInMod && unified)
         {
             ModWriter.WriteOption(modRoot, sourceModDir, sourceModName, SwapGroup, optionName, bakes, SwapGroupPriority);
             BakeService.Publish(plugin, sourceModDir, isNew: false, SwapGroup, optionName);
@@ -113,12 +116,14 @@ public static class SwapService
             return;
         }
 
-        // pre-unified mod layout: a sibling mod next to it
+        // a separate mod next to the source, one option per swap; also where older mod
+        // layouts always go. The source mod stays untouched (switching it off makes the
+        // swap a move rather than a copy).
         var sibling = SiblingDir(sourceModName);
         var isNew = !plugin.Penumbra.KnowsMod(sibling);
         ModWriter.WriteOption(modRoot, sibling, sibling, SwapGroup, optionName, bakes, SwapGroupPriority);
         BakeService.Publish(plugin, sibling, isNew, SwapGroup, optionName);
-        Plugin.Print($"Added \"{optionName}\" as a new mod, \"{sibling}\".{startNote} Turn it off in Penumbra whenever.");
+        Plugin.Print($"Added \"{optionName}\" to {(isNew ? "a new mod" : "the mod")} \"{sibling}\".{startNote} {sourceModName} itself is untouched.");
     }
 
     private static string SiblingDir(string sourceModName)
