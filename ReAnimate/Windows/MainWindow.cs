@@ -105,6 +105,9 @@ public sealed class MainWindow : Window
         if (!GameState.PlayableRaces.Contains(race))
             race = info.RaceSexId;
 
+        // snapping mid-emote freezes one frame of it, which reads as limbs out of place
+        ImGui.TextColored(ColWarn, "Saves a still frame of your pose, not a moving animation. To copy a mod's animation, use Animation Swap.");
+
         var onScreen = Enum.IsDefined(info.Family) ? $"{GameState.FamilyName(info.Family)} {info.Slot}" : "no idle detected";
         ImGui.TextColored(ColDim, $"On screen now: {onScreen}"
             + (Plugin.ClientState.IsGPosing ? "  (GPose: snapping the GPose target)" : ""));

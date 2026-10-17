@@ -61,7 +61,9 @@ off too.
 
 ReAnimate turns your character's current pose into an idle pose (including combat/weapon
 poses) with a single click. It keeps natural breathing motion, so the result doesn't look
-static, and it works whether you posed in GPose or not.
+static, and it works whether you posed in GPose or not. It saves a still frame, not a moving
+animation: saving in the middle of an emote freezes that one moment. To copy a mod's
+animation, use Animation Swap.
 
 - `/reanimate` opens the window. Idle2Pose tab: pick race, pose type and slot (they default
   to what you're doing on screen), then save. Animation Swap tab: see above.
