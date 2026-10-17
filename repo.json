@@ -1,0 +1,27 @@
+[
+  {
+    "Name": "ReAnimate (Instant Start)",
+    "Author": "Nyaughty, fork by MattOnTheStack",
+    "Punchline": "ReAnimate, plus instant starts when moving idles between /cpose slots.",
+    "Description": "A fork of Nyaughty's ReAnimate. Animation Swap can make the start transition instant when an idle has no start of its own, and default-idle mods can be moved onto numbered /cpose slots. Everything else is ReAnimate as it is: turn your current pose into an idle pose with a single click.",
+    "InternalName": "ReAnimateInstantStart",
+    "AssemblyVersion": "1.2.3.1",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/MattOnTheStack/ReAnimate",
+    "IconUrl": "https://raw.githubusercontent.com/MattOnTheStack/ReAnimate/main/icon/reanimate.png",
+    "Tags": [
+      "penumbra",
+      "pose",
+      "idle",
+      "animation",
+      "cpose"
+    ],
+    "DalamudApiLevel": 15,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "LastUpdate": 1792262817,
+    "DownloadLinkInstall": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.1/ReAnimateInstantStart.zip",
+    "DownloadLinkUpdate": "https://github.com/MattOnTheStack/ReAnimate/releases/download/v1.2.3.1/ReAnimateInstantStart.zip",
+    "Changelog": "Add instant start for idle swaps, fix default-idle swaps\n\nFork of ReAnimate as \"ReAnimate (Instant Start)\" (InternalName\nReAnimateInstantStart) so it installs next to the official plugin.\n\n- Animation Swap: when the animation has no start of its own, the target\n  /cpose slot's vanilla start is cut to one frame (C009 duration 1), so the\n  idle begins at once. A radio choice keeps the vanilla transition instead.\n- Default idles (resident/idle, and the sit/ground-sit/doze bases) can be\n  swapped onto numbered slots: a single-file animation now fills a slot's\n  loop, and stance bases are offered their own stance's slots.\n- GitHub Actions builds every push, publishes a release and updates\n  repo.json on the dist branch.\n- Offline checks cover the instant-start patch on a real vanilla start.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\r\n"
+  }
+]
